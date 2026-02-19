@@ -81,38 +81,46 @@ export default function Projects() {
   if (!user) return null;
 
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
-      <h2>🚀 Projects</h2>
+    <div className="ds-page">
+      <h2 className="ds-h2">🚀 Projects</h2>
 
-      {/* CREATE PROJECT */}
-      <input
-        placeholder="Project title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <input
-        placeholder="Description"
-        value={desc}
-        onChange={(e) => setDesc(e.target.value)}
-      />
-      <button onClick={createProject}>Create</button>
-
-      <hr />
-
-      {/* PROJECT LIST */}
-      {projects.map((p) => (
-        <div key={p.id} style={{ border: "1px solid gray", padding: 10 }}>
-          <h3>{p.title}</h3>
-          <p>{p.description}</p>
-
+      <div className="ds-card mb-6">
+        <div className="ds-form-group">
           <input
-            placeholder="Invite username"
-            value={inviteUsername}
-            onChange={(e) => setInviteUsername(e.target.value)}
+            className="ds-input"
+            placeholder="Project title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
           />
-          <button onClick={() => sendInvite(p.id)}>
-            Invite Collaborator
-          </button>
+        </div>
+        <div className="ds-form-group">
+          <input
+            className="ds-input"
+            placeholder="Description"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+          />
+        </div>
+        <button className="ds-btn ds-btn-primary" onClick={createProject}>Create</button>
+      </div>
+
+      <div className="ds-divider" />
+
+      {projects.map((p) => (
+        <div key={p.id} className="ds-card mb-4">
+          <h3 className="ds-h3">{p.title}</h3>
+          <p className="ds-text-muted">{p.description}</p>
+          <div className="ds-form-row mt-4">
+            <input
+              className="ds-input flex-1"
+              placeholder="Invite username"
+              value={inviteUsername}
+              onChange={(e) => setInviteUsername(e.target.value)}
+            />
+            <button className="ds-btn ds-btn-secondary ds-btn-sm" onClick={() => sendInvite(p.id)}>
+              Invite Collaborator
+            </button>
+          </div>
         </div>
       ))}
     </div>

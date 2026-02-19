@@ -32,9 +32,10 @@ export default function Requests() {
   async function fetchRequests(uid) {
     const { data } = await supabase
       .from("collab_requests")
-      .select("*, projects(title)")
+      .select("*")
       .eq("receiver_id", uid)
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
 
     setRequests(data || []);
   }
@@ -47,9 +48,13 @@ export default function Requests() {
       .channel("collab-requests")
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "collab_requests" },
+        {
+          event: "*", // listen to insert + update
+          schema: "public",
+          table: "collab_requests",
+        },
         (payload) => {
-          if (payload.new.receiver_id === uid) {
+          if (payload.new?.receiver_id === uid) {
             fetchRequests(uid);
           }
         }
@@ -74,18 +79,11 @@ export default function Requests() {
       await supabase.from("notifications").insert({
         user_id: req.sender_id,
         sender_id: user.id,
-        type: "collab_accept"
+        type: "collab_accept",
+        read: false
       });
 
-      // 3️⃣ Add to project members (if exists)
-      if (req.project_id) {
-        await supabase.from("project_members").insert({
-          project_id: req.project_id,
-          user_id: user.id,
-        });
-      }
-
-      // 4️⃣ Check existing conversation
+      // 3️⃣ Check existing conversation
       const { data: myConvos } = await supabase
         .from("conversation_participants")
         .select("conversation_id")
@@ -107,7 +105,7 @@ export default function Requests() {
         }
       }
 
-      // 5️⃣ Create new conversation
+      // 4️⃣ Create new conversation
       const { data: convo } = await supabase
         .from("conversations")
         .insert({})
@@ -121,7 +119,6 @@ export default function Requests() {
 
       fetchRequests(user.id);
 
-      // 6️⃣ Redirect
       router.push(`/chat/${convo.id}`);
 
     } catch (err) {
@@ -146,52 +143,36 @@ export default function Requests() {
   // UI
   // =====================
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
-      <h2>🤝 Collaboration Requests</h2>
+    <div className="ds-page">
+      <h2 className="ds-h2">🤝 Collaboration Requests</h2>
 
       {requests.length === 0 && (
-        <p>No pending requests</p>
+        <p className="ds-text-muted">No pending requests</p>
       )}
 
       {requests.map((r) => (
-        <div
-          key={r.id}
-          style={{
-            border: "1px solid gray",
-            padding: 12,
-            marginBottom: 10,
-            borderRadius: 8
-          }}
-        >
-          <p>
-            <b>Project:</b> {r.projects?.title || "Untitled"}
+        <div key={r.id} className="ds-card mb-4">
+          
+          {/* ✅ SHOW TITLE FROM collab_requests TABLE */}
+          <p className="ds-text-muted">
+            <b className="text-white">Project:</b> {r.title || "Untitled"}
           </p>
 
-          <p>
-            <b>Message:</b> {r.message || "Wants to collaborate"}
+          <p className="ds-text-muted mt-2">
+            <b className="text-white">Message:</b> {r.message || "Wants to collaborate"}
           </p>
 
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="ds-form-row mt-4">
             <button
+              className="ds-btn ds-btn-success ds-btn-sm"
               onClick={() => accept(r)}
-              style={{
-                background: "green",
-                color: "white",
-                padding: "6px 12px",
-                borderRadius: 6
-              }}
             >
               Accept
             </button>
 
             <button
+              className="ds-btn ds-btn-danger ds-btn-sm"
               onClick={() => reject(r.id)}
-              style={{
-                background: "red",
-                color: "white",
-                padding: "6px 12px",
-                borderRadius: 6
-              }}
             >
               Reject
             </button>

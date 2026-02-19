@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
@@ -18,6 +18,12 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState([]);
   const [selectedNiche, setSelectedNiche] = useState("all");
+  const [expandedComments, setExpandedComments] = useState({});
+  const notifRef = useRef(null);
+
+  function toggleComments(postId) {
+    setExpandedComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
+  }
 
   // =====================
   // GET USER
@@ -247,117 +253,166 @@ export default function Dashboard() {
     router.push("/login");
   }
 
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (showNotif && notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotif(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showNotif]);
+
   if (!user) return null;
 
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
+    <div className="ds-dashboard-page">
 
-      {/* HEADER */}
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={() => router.push("/create-post")}>➕</button>
-        <button onClick={() => router.push("/edit-profile")}>✏️</button>
+      {/* FIXED HEADER */}
+      <header className="ds-dashboard-header">
+        <div className="ds-dashboard-header-inner">
+          <button className="ds-dashboard-header-btn" onClick={() => router.push("/create-post")} title="Create post">➕</button>
+          <button className="ds-dashboard-header-btn" onClick={() => router.push("/edit-profile")} title="Edit profile">✏️</button>
 
-        <button onClick={() => {
-          setShowNotif(!showNotif);
-          markNotificationsRead();
-        }}>
-          🔔 ({notifications.length})
-        </button>
+          <div className="ds-notif-dropdown-wrapper" ref={notifRef}>
+            <button
+              className="ds-dashboard-header-btn"
+              onClick={() => {
+                setShowNotif(!showNotif);
+                markNotificationsRead();
+              }}
+              title="Notifications"
+            >
+              🔔 ({notifications.length})
+            </button>
+            {showNotif && (
+              <div className="ds-notif-dropdown">
+                {notifications.length === 0 && <p className="ds-text-muted p-3">No new notifications</p>}
+                {notifications.map(n => (
+                  <div key={n.id} className="ds-notif-item">
+                    🔔 {n.type} from {n.sender_id}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <button onClick={()=>router.push("/recommended-collaborators")}>
-          🤖 AI Matches
-        </button>
+          <button className="ds-dashboard-header-btn" onClick={() => router.push("/recommended-collaborators")} title="AI Matches">🤖</button>
+          <button className="ds-dashboard-header-btn" onClick={() => router.push("/collab-requests")} title="Collaboration requests">🤝</button>
+          <button className="ds-dashboard-header-btn" onClick={() => router.push("/inbox")} title="Inbox">💬</button>
+          <button className="ds-dashboard-header-btn" onClick={logout} title="Logout">🚪</button>
+        </div>
+      </header>
 
-        <button onClick={() => router.push("/collab-requests")}>🤝</button>
-        <button onClick={() => router.push("/inbox")}>💬</button>
-        <button onClick={logout}>🚪</button>
-      </div>
+      {/* MAIN CONTENT */}
+      <main className="ds-dashboard-content">
 
-      {/* NOTIFICATIONS PANEL */}
-      {showNotif && (
-        <div style={{
-          border:"1px solid gray",
-          padding:10,
-          marginTop:10,
-          borderRadius:8,
-          background:"#111",
-          color:"white"
-        }}>
-          {notifications.length === 0 && <p>No new notifications</p>}
-          {notifications.map(n => (
-            <div key={n.id}>
-              🔔 {n.type} from {n.sender_id}
+        {/* NICHE FILTER CHIPS */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            className={`ds-dashboard-chip ${selectedNiche === "all" ? "active" : ""}`}
+            onClick={() => setSelectedNiche("all")}
+          >All</button>
+          <button
+            className={`ds-dashboard-chip ${selectedNiche === "music" ? "active" : ""}`}
+            onClick={() => setSelectedNiche("music")}
+          >Music</button>
+          <button
+            className={`ds-dashboard-chip ${selectedNiche === "dance" ? "active" : ""}`}
+            onClick={() => setSelectedNiche("dance")}
+          >Dance</button>
+          <button
+            className={`ds-dashboard-chip ${selectedNiche === "writing" ? "active" : ""}`}
+            onClick={() => setSelectedNiche("writing")}
+          >Writing</button>
+        </div>
+
+        {/* SEARCH BAR */}
+        <input
+          className="ds-dashboard-search mb-4"
+          placeholder="Search users..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+
+        {/* SEARCH RESULTS */}
+        {results.length > 0 && (
+          <div className="ds-card mb-6">
+            {results.map(r => (
+              <div
+                key={r.id}
+                className="ds-search-item"
+                onClick={() => router.push(`/profile/${r.id}`)}
+              >
+                <img src={r.avatar_url} alt="" className="ds-avatar w-8 h-8" width={32} height={32} />
+                <span>{r.username}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <h2 className="ds-h2">Feed</h2>
+
+        {loading && <p className="ds-loading">Loading...</p>}
+
+        {/* POST CARDS */}
+        {posts.map(post => (
+          <article key={post.id} className="ds-post-card">
+            <div className="ds-post-header">
+              <b
+                className="ds-post-username"
+                onClick={() => router.push(`/profile/${post.user_id}`)}
+              >
+                {post.profiles?.username}
+              </b>
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* NICHE FILTER (SPACING VERSION) */}
-      <div style={{ marginTop: 10, display:"flex", gap:10, flexWrap:"wrap" }}>
-        <button onClick={() => setSelectedNiche("all")}>All</button>
-        <button onClick={() => setSelectedNiche("music")}>Music</button>
-        <button onClick={() => setSelectedNiche("dance")}>Dance</button>
-        <button onClick={() => setSelectedNiche("writing")}>Writing</button>
-      </div>
+            {post.image_url && (
+              <div className="ds-post-card-image">
+                <img src={post.image_url} alt="" />
+              </div>
+            )}
 
-      {/* SEARCH */}
-      <input
-        placeholder="Search users..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-      />
+            <p className="ds-text-muted">{post.caption}</p>
 
-      {results.map(r => (
-        <div key={r.id}
-          onClick={() => router.push(`/profile/${r.id}`)}
-          style={{ cursor:"pointer", display:"flex", gap:10 }}>
-          <img src={r.avatar_url} width={30} />
-          {r.username}
-        </div>
-      ))}
+            <div className="ds-post-card-actions">
+              <button className="ds-post-card-btn ds-post-card-btn-ghost ds-like-btn" onClick={() => toggleLike(post)}>
+                {post.liked ? "❤️" : "🤍"} {post.likeCount}
+              </button>
 
-      <h2>Feed</h2>
+              <button className="ds-post-card-btn ds-post-card-btn-ghost ds-like-btn" onClick={() => toggleComments(post.id)} title="Comments">
+                💬 {post.comments?.length || 0}
+              </button>
 
-      {loading && <p>Loading...</p>}
+              {expandedComments[post.id] && (
+                <>
+                  {post.comments.map(c => (
+                    <div key={c.id} className="ds-text-muted mt-2 text-sm w-full">
+                      <b className="text-white">{c.profiles?.username}:</b> {c.content}
+                      {c.user_id === user.id && (
+                        <button className="ds-post-card-btn ds-post-card-btn-ghost ml-1 inline p-1" onClick={() => deleteComment(c.id)}>❌</button>
+                      )}
+                    </div>
+                  ))}
+                  <div className="ds-post-comment-row w-full">
+                    <input
+                      className="ds-input"
+                      placeholder="Add a comment..."
+                      value={commentInputs[post.id] || ""}
+                      onChange={e => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                    />
+                    <button className="ds-post-card-btn ds-post-card-btn-secondary" onClick={() => addComment(post.id)}>Post</button>
+                  </div>
+                </>
+              )}
 
-      {posts.map(post => (
-        <div key={post.id} style={{ border:"1px solid #333", padding:15, marginTop:15 }}>
-          <b onClick={() => router.push(`/profile/${post.user_id}`)}>
-            {post.profiles?.username}
-          </b>
-
-          {post.image_url && (
-            <img src={post.image_url} style={{ width:"100%" }} />
-          )}
-
-          <p>{post.caption}</p>
-
-          <button onClick={() => toggleLike(post)}>
-            {post.liked ? "❤️" : "🤍"} {post.likeCount}
-          </button>
-
-          {post.comments.map(c => (
-            <p key={c.id}>
-              <b>{c.profiles?.username}:</b> {c.content}
-              {c.user_id === user.id &&
-                <button onClick={() => deleteComment(c.id)}>❌</button>}
-            </p>
-          ))}
-
-          <input
-            placeholder="Comment..."
-            value={commentInputs[post.id] || ""}
-            onChange={e =>
-              setCommentInputs({ ...commentInputs, [post.id]: e.target.value })
-            }
-          />
-
-          <button onClick={() => addComment(post.id)}>Post</button>
-
-          {post.user_id !== user.id &&
-            <button onClick={() => startChat(post.user_id)}>Message</button>}
-        </div>
-      ))}
+              {post.user_id !== user.id && (
+                <button className="ds-post-card-btn ds-post-card-btn-ghost" onClick={() => startChat(post.user_id)}>Message</button>
+              )}
+            </div>
+          </article>
+        ))}
+      </main>
     </div>
   );
 }

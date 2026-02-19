@@ -31,27 +31,43 @@ export default function Login() {
   };
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>Login</h1>
+    <div className="ds-page flex min-h-screen flex-col items-center justify-center">
+      <div className="ds-card w-full max-w-[400px]">
+        <h1 className="ds-h1 text-center">Login</h1>
 
-      <input
-        placeholder="Email"
-        onChange={(e) => setEmail(e.target.value)}
-      />
+        <div className="ds-form-group">
+          <input
+            className="ds-input"
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
 
-      <br /><br />
+        <div className="ds-form-group">
+          <input
+            className="ds-input"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
 
-      <input
-        type="password"
-        placeholder="Password"
-        onChange={(e) => setPassword(e.target.value)}
-      />
+        <button
+          className="ds-btn ds-btn-primary w-full"
+          onClick={login}
+          disabled={loading}
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
 
-      <br /><br />
-
-      <button onClick={login} disabled={loading}>
-        {loading ? "Logging in..." : "Login"}
-      </button>
+        <p className="ds-text-muted mt-4 text-center text-sm">
+          Don&apos;t have an account?{" "}
+          <a href="/signup" className="ds-link">Sign up</a>
+        </p>
+      </div>
     </div>
   );
 }

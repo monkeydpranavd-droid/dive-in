@@ -42,32 +42,19 @@ export default function Recommended() {
   }
 
   return (
-    <div style={{maxWidth:600,margin:"auto",padding:20}}>
+    <div className="ds-page">
+      <h2 className="ds-h2">🤖 AI Collaborator Matches</h2>
 
-      <h2>🤖 AI Collaborator Matches</h2>
-
-      {matches.map(m=>(
-        <div key={m.id}
-          style={{
-            border:"1px solid gray",
-            padding:12,
-            marginTop:12,
-            borderRadius:8
-          }}
-        >
-          <b>{m.username}</b>
-
-          <p>🎯 Niche: {m.niche}</p>
-          <p>🛠 Skills: {m.skills}</p>
-
-          <button
-            onClick={()=>router.push(`/profile/${m.id}`)}
-          >
+      {matches.map(m => (
+        <div key={m.id} className="ds-card mb-4">
+          <b className="block">{m.username}</b>
+          <p className="ds-text-muted mt-1">🎯 Niche: {m.niche}</p>
+          <p className="ds-text-muted mt-1">🛠 Skills: {m.skills}</p>
+          <button className="ds-btn ds-btn-primary ds-btn-sm mt-3" onClick={() => router.push(`/profile/${m.id}`)}>
             View Profile
           </button>
         </div>
       ))}
-
     </div>
   );
 }

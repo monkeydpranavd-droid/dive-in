@@ -44,27 +44,43 @@ export default function Signup() {
   };
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>Signup</h1>
+    <div className="ds-page flex min-h-screen flex-col items-center justify-center">
+      <div className="ds-card w-full max-w-[400px]">
+        <h1 className="ds-h1 text-center">Sign Up</h1>
 
-      <input
-        placeholder="Email"
-        onChange={(e) => setEmail(e.target.value)}
-      />
+        <div className="ds-form-group">
+          <input
+            className="ds-input"
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
 
-      <br /><br />
+        <div className="ds-form-group">
+          <input
+            className="ds-input"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
 
-      <input
-        type="password"
-        placeholder="Password"
-        onChange={(e) => setPassword(e.target.value)}
-      />
+        <button
+          className="ds-btn ds-btn-primary w-full"
+          onClick={signUp}
+          disabled={loading}
+        >
+          {loading ? "Signing up..." : "Sign Up"}
+        </button>
 
-      <br /><br />
-
-      <button onClick={signUp} disabled={loading}>
-        {loading ? "Signing up..." : "Signup"}
-      </button>
+        <p className="ds-text-muted mt-4 text-center text-sm">
+          Already have an account?{" "}
+          <a href="/login" className="ds-link">Login</a>
+        </p>
+      </div>
     </div>
   );
 }

@@ -6,16 +6,10 @@ import { useRouter } from "next/navigation";
 
 export default function Inbox() {
   const router = useRouter();
-
   const [user, setUser] = useState(null);
   const [conversations, setConversations] = useState([]);
-  const [onlineUsers, setOnlineUsers] = useState({});
-  const [typingUsers, setTypingUsers] = useState({});
-  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  // =====================
-  // GET USER
-  // =====================
   useEffect(() => {
     getUser();
   }, []);
@@ -25,199 +19,144 @@ export default function Inbox() {
     if (!data.user) return router.push("/login");
 
     setUser(data.user);
-    fetchInbox(data.user.id);
-
-    trackOnline(data.user.id);
-    subscribeMessages(data.user.id);
+    fetchConversations(data.user.id);
   }
 
-  // =====================
-  // FETCH INBOX
-  // =====================
-  async function fetchInbox(uid) {
-    const { data: parts } = await supabase
+  // ✅ REALTIME REFRESH WHEN NEW MESSAGE ARRIVES
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("inbox-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        () => {
+          fetchConversations(user.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  async function fetchConversations(userId) {
+    setLoading(true);
+
+    const { data: myConvos, error } = await supabase
       .from("conversation_participants")
       .select("conversation_id")
-      .eq("user_id", uid);
+      .eq("user_id", userId);
 
-    const ids = parts?.map(p => p.conversation_id) || [];
-    if (!ids.length) return setConversations([]);
+    if (error || !myConvos?.length) {
+      setConversations([]);
+      setLoading(false);
+      return;
+    }
 
-    const list = await Promise.all(
-      ids.map(async (cid) => {
+    const convoIds = myConvos.map(c => c.conversation_id);
 
-        const { data: lastMsg } = await supabase
+    const convoData = await Promise.all(
+      convoIds.map(async (convoId) => {
+
+        // ✅ Get all participants of this conversation
+        const { data: participants } = await supabase
+          .from("conversation_participants")
+          .select("*")
+          .eq("conversation_id", convoId);
+
+        // Find the other user
+        const other = participants?.find(p => p.user_id !== userId);
+
+        let profile = null;
+
+        if (other) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url")
+            .eq("id", other.user_id)
+            .single();
+
+          profile = data;
+        }
+
+        // ✅ Get last message
+        const { data: lastMessage } = await supabase
           .from("messages")
           .select("*")
-          .eq("conversation_id", cid)
+          .eq("conversation_id", convoId)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        const { data: other } = await supabase
-          .from("conversation_participants")
-          .select("user_id, profiles(username,avatar_url)")
-          .eq("conversation_id", cid)
-          .neq("user_id", uid)
-          .single();
-
         return {
-          id: cid,
-          lastMsg,
-          otherUserId: other?.user_id,
-          otherUser: other?.profiles
+          conversation_id: convoId,
+          user: profile,
+          lastMessage: lastMessage?.content || "Start conversation",
+          lastTime: lastMessage?.created_at || null
         };
       })
     );
 
-    setConversations(list);
+    // Sort by latest message
+    convoData.sort((a, b) => {
+      if (!a.lastTime) return 1;
+      if (!b.lastTime) return -1;
+      return new Date(b.lastTime) - new Date(a.lastTime);
+    });
+
+    setConversations(convoData);
+    setLoading(false);
   }
-
-  // =====================
-  // REALTIME NEW MSG
-  // =====================
-  function subscribeMessages(uid) {
-    supabase
-      .channel("messages")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        () => fetchInbox(uid)
-      )
-      .subscribe();
-  }
-
-  // =====================
-  // ONLINE PRESENCE
-  // =====================
-  function trackOnline(uid) {
-    const channel = supabase.channel("online-users", {
-      config: { presence: { key: uid } }
-    });
-
-    channel.on("presence", { event: "sync" }, () => {
-      const state = channel.presenceState();
-
-      const online = {};
-      Object.keys(state).forEach(id => {
-        online[id] = true;
-      });
-
-      setOnlineUsers(online);
-    });
-
-    channel.subscribe(async status => {
-      if (status === "SUBSCRIBED") {
-        await channel.track({ online: true });
-      }
-    });
-  }
-
-  // =====================
-  // TYPING CHANNEL
-  // =====================
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase.channel("typing");
-
-    channel.on("broadcast", { event: "typing" }, payload => {
-      setTypingUsers(prev => ({
-        ...prev,
-        [payload.userId]: payload.typing
-      }));
-    });
-
-    channel.subscribe();
-
-    return () => channel.unsubscribe();
-  }, [user]);
-
-  // =====================
-  // SEARCH FILTER
-  // =====================
-  const filtered = conversations.filter(c =>
-    c.otherUser?.username
-      ?.toLowerCase()
-      .includes(search.toLowerCase())
-  );
 
   if (!user) return null;
 
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
-
-      <h2>📩 Inbox</h2>
-
-      {/* SEARCH */}
-      <input
-        placeholder="Search chats..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{
-          width: "100%",
-          padding: 10,
-          marginBottom: 15
-        }}
-      />
-
-      {filtered.map(c => (
-        <div
-          key={c.id}
-          onClick={() => router.push(`/chat/${c.id}`)}
-          style={{
-            display: "flex",
-            gap: 10,
-            padding: 12,
-            borderBottom: "1px solid #333",
-            cursor: "pointer"
-          }}
-        >
-
-          {/* AVATAR */}
-          <div style={{ position: "relative" }}>
-            <img
-              src={c.otherUser?.avatar_url || "/avatar.png"}
-              width={45}
-              height={45}
-              style={{ borderRadius: "50%" }}
-            />
-
-            {/* ONLINE DOT */}
-            {onlineUsers[c.otherUserId] && (
-              <span style={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                width: 12,
-                height: 12,
-                background: "limegreen",
-                borderRadius: "50%"
-              }} />
-            )}
-          </div>
-
-          <div>
-            <b>{c.otherUser?.username || "User"}</b>
-
-            <p style={{ opacity: 0.7 }}>
-              {typingUsers[c.otherUserId]
-                ? "typing..."
-                : c.lastMsg?.content || "Start chatting"}
-            </p>
-          </div>
-
-          {/* UNREAD DOT */}
-          {!c.lastMsg?.seen &&
-            c.lastMsg?.sender_id !== user.id && (
-              <span style={{ marginLeft: "auto" }}>
-                🔵
-              </span>
-            )}
-
+    <div className="ds-dashboard-page">
+      <header className="ds-dashboard-header">
+        <div className="ds-dashboard-header-inner">
+          <h2>📥 Inbox</h2>
         </div>
-      ))}
+      </header>
 
+      <main className="ds-dashboard-content">
+
+        {loading && <p>Loading...</p>}
+
+        {!loading && conversations.length === 0 && (
+          <p className="ds-text-muted">No conversations yet</p>
+        )}
+
+        {conversations.map(convo => (
+          <div
+            key={convo.conversation_id}
+            className="ds-card cursor-pointer mb-3 flex items-center gap-3"
+            onClick={() => router.push(`/chat/${convo.conversation_id}`)}
+          >
+            <img
+              src={convo.user?.avatar_url || "/default-avatar.png"}
+              width={40}
+              height={40}
+              className="ds-avatar w-10 h-10"
+              alt=""
+            />
+            <div>
+              <div className="font-semibold">
+                {convo.user?.username || "Unknown User"}
+              </div>
+              <div className="ds-text-muted text-sm">
+                {convo.lastMessage}
+              </div>
+            </div>
+          </div>
+        ))}
+      </main>
     </div>
   );
 }

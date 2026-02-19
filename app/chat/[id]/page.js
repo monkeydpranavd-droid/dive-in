@@ -12,28 +12,63 @@ export default function ChatPage() {
   const [text, setText] = useState("");
 
   const bottomRef = useRef(null);
+  const channelRef = useRef(null);
 
   // =========================
   // GET USER
   // =========================
   useEffect(() => {
+    async function getUser() {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    }
     getUser();
   }, []);
 
-  async function getUser() {
-    const { data } = await supabase.auth.getUser();
-    setUser(data.user);
-  }
-
   // =========================
-  // FETCH MESSAGES
+  // FETCH MESSAGES + SUBSCRIBE
   // =========================
   useEffect(() => {
-    if (!convoId) return;
+    if (!convoId || !user) return;
 
     fetchMessages();
-    subscribeMessages();
-  }, [convoId]);
+
+    // Clean previous subscription if exists
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    const channel = supabase
+      .channel(`chat-${convoId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${convoId}`,
+        },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new]);
+
+          // Mark as seen if it's not your message
+          if (payload.new.sender_id !== user.id) {
+            markSeen(payload.new.id);
+          }
+
+          scrollDown();
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, [convoId, user]);
 
   async function fetchMessages() {
     const { data } = await supabase
@@ -47,50 +82,20 @@ export default function ChatPage() {
   }
 
   // =========================
-  // REALTIME SUBSCRIPTION
-  // =========================
-  function subscribeMessages() {
-    const channel = supabase
-      .channel("chat-room")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${convoId}`,
-        },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
-          scrollDown();
-          markSeen(payload.new.id);
-        }
-      )
-      .subscribe();
-
-    return () => supabase.removeChannel(channel);
-  }
-
-  // =========================
   // SEND MESSAGE
   // =========================
   async function sendMessage() {
     if (!text.trim() || !user) return;
 
-    const { data, error } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: convoId,
-        sender_id: user.id,
-        content: text,
-      })
-      .select()
-      .single();
+    const { error } = await supabase.from("messages").insert({
+      conversation_id: convoId,
+      sender_id: user.id,
+      content: text,
+      seen: false,
+    });
 
     if (!error) {
-      setMessages((prev) => [...prev, data]);
       setText("");
-      scrollDown();
     }
   }
 
@@ -98,11 +103,13 @@ export default function ChatPage() {
   // SEEN STATUS
   // =========================
   async function markSeen(messageId) {
+    if (!user) return;
+
     await supabase
       .from("messages")
       .update({ seen: true })
       .eq("id", messageId)
-      .neq("sender_id", user?.id);
+      .neq("sender_id", user.id);
   }
 
   // =========================
@@ -117,50 +124,27 @@ export default function ChatPage() {
   if (!user) return null;
 
   return (
-    <div
-      style={{
-        maxWidth: 600,
-        margin: "auto",
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/* HEADER */}
-      <h3>💬 Chat</h3>
+    <div className="ds-chat-container">
+      <h3 className="ds-h3">💬 Chat</h3>
 
-      {/* MESSAGES */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          border: "1px solid #333",
-          padding: 10,
-        }}
-      >
+      <div className="ds-chat-messages">
         {messages.map((m) => (
           <div
             key={m.id}
-            style={{
-              textAlign: m.sender_id === user.id ? "right" : "left",
-              margin: "8px 0",
-            }}
+            className={m.sender_id === user.id ? "text-right" : "text-left"}
           >
             <div
-              style={{
-                display: "inline-block",
-                background:
-                  m.sender_id === user.id ? "#4caf50" : "#444",
-                padding: 10,
-                borderRadius: 10,
-                color: "white",
-              }}
+              className={`ds-msg ${
+                m.sender_id === user.id
+                  ? "ds-msg-sent"
+                  : "ds-msg-received"
+              }`}
             >
               {m.content}
             </div>
 
             {m.sender_id === user.id && (
-              <div style={{ fontSize: 12 }}>
+              <div className="ds-text-subtle mt-1 text-xs">
                 {m.seen ? "✓✓ Seen" : "✓ Sent"}
               </div>
             )}
@@ -170,16 +154,23 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* INPUT */}
-      <div style={{ display: "flex", gap: 10, padding: 10 }}>
+      <div className="ds-chat-input-row">
         <input
-          style={{ flex: 1, padding: 10 }}
+          className="ds-input flex-1"
           placeholder="Type message..."
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
         />
 
-        <button onClick={sendMessage}>Send</button>
+        <button className="ds-btn ds-btn-primary" onClick={sendMessage}>
+          Send
+        </button>
       </div>
     </div>
   );

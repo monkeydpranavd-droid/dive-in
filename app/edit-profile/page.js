@@ -84,48 +84,50 @@ export default function EditProfile() {
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 500, margin: "auto" }}>
-      <h2>✏️ Edit Profile</h2>
+    <div className="ds-page">
+      <div className="ds-card max-w-[500px]">
+        <h2 className="ds-h2">✏️ Edit Profile</h2>
 
-      {/* AVATAR PREVIEW */}
-      {avatarUrl && (
-        <img
-          src={avatarUrl}
-          width={120}
-          height={120}
-          style={{ borderRadius: "50%", marginBottom: 20 }}
-        />
-      )}
+        {avatarUrl && (
+          <img
+            src={avatarUrl}
+            width={120}
+            height={120}
+            alt="Avatar"
+            className="ds-avatar mb-5 block"
+          />
+        )}
 
-      {/* AVATAR UPLOAD */}
-      <p>Upload Avatar</p>
-      <input type="file" onChange={uploadAvatar} />
-      {uploading && <p>Uploading...</p>}
+        <div className="ds-form-group">
+          <label>Upload Avatar</label>
+          <input
+            type="file"
+            onChange={uploadAvatar}
+            className="ds-input"
+            accept="image/*"
+          />
+          {uploading && <p className="ds-text-muted mt-2">Uploading...</p>}
+        </div>
 
-      {/* USERNAME */}
-      <p>Username</p>
-      <input
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        placeholder="Enter username"
-        style={{ width: "100%", padding: 8 }}
-      />
+        <div className="ds-form-group">
+          <label>Username</label>
+          <input
+            className="ds-input"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter username"
+          />
+        </div>
 
-      {/* SAVE */}
-      <button
-        onClick={saveProfile}
-        style={{ marginTop: 20 }}
-      >
-        Save Profile
-      </button>
-
-      {/* BACK */}
-      <button
-        onClick={() => router.push("/dashboard")}
-        style={{ marginLeft: 10 }}
-      >
-        Cancel
-      </button>
+        <div className="ds-form-row mt-4">
+          <button className="ds-btn ds-btn-primary" onClick={saveProfile}>
+            Save Profile
+          </button>
+          <button className="ds-btn ds-btn-secondary" onClick={() => router.push("/dashboard")}>
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

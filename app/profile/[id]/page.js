@@ -13,6 +13,10 @@ export default function ProfilePage() {
   const [user, setUser] = useState(null);
   const [isFollowing, setIsFollowing] = useState(false);
 
+  const [showCollabBox, setShowCollabBox] = useState(false);
+  const [collabTitle, setCollabTitle] = useState("");
+  const [collabMessage, setCollabMessage] = useState("");
+
   useEffect(() => {
     if (id) {
       getUser();
@@ -26,22 +30,25 @@ export default function ProfilePage() {
   // =====================
   async function getUser() {
     const { data } = await supabase.auth.getUser();
-    setUser(data.user);
+    const currentUser = data?.user || null;
+    setUser(currentUser);
 
-    if (data.user) checkFollow(data.user.id);
+    if (currentUser) {
+      checkFollow(currentUser.id);
+    }
   }
 
   // =====================
   // FETCH PROFILE
   // =====================
   async function fetchProfile() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", id)
-      .maybeSingle(); // ✅ safer
+      .maybeSingle();
 
-    setProfile(data);
+    if (!error) setProfile(data);
   }
 
   // =====================
@@ -82,17 +89,19 @@ export default function ProfilePage() {
       following_id: id,
     });
 
-    // ✅ notify
     await supabase.from("notifications").insert({
       user_id: id,
       sender_id: user.id,
-      type: "follow"
+      type: "follow",
+      read: false
     });
 
     setIsFollowing(true);
   }
 
   async function unfollow() {
+    if (!user) return;
+
     await supabase
       .from("follows")
       .delete()
@@ -103,13 +112,23 @@ export default function ProfilePage() {
   }
 
   // =====================
-  // 🤝 COLLAB REQUEST
+  // 🤝 SEND COLLAB REQUEST
   // =====================
   async function sendCollabRequest() {
     if (!user) return;
 
     if (user.id === id) {
       alert("You can't collaborate with yourself 😅");
+      return;
+    }
+
+    if (!collabTitle.trim()) {
+      alert("Please enter a project title");
+      return;
+    }
+
+    if (!collabMessage.trim()) {
+      alert("Please write a message");
       return;
     }
 
@@ -131,7 +150,8 @@ export default function ProfilePage() {
       .insert({
         sender_id: user.id,
         receiver_id: id,
-        message: "Let's collaborate!",
+        title: collabTitle,
+        message: collabMessage,
         status: "pending"
       });
 
@@ -139,20 +159,24 @@ export default function ProfilePage() {
       await supabase.from("notifications").insert({
         user_id: id,
         sender_id: user.id,
-        type: "collab"
+        type: "collab",
+        read: false
       });
 
       alert("🤝 Collaboration request sent!");
+
+      setCollabTitle("");
+      setCollabMessage("");
+      setShowCollabBox(false);
     }
   }
 
   // =====================
-  // 💬 START CHAT
+  // START CHAT
   // =====================
   async function startChat() {
     if (!user) return;
 
-    // find existing
     const { data: myConvos } = await supabase
       .from("conversation_participants")
       .select("conversation_id")
@@ -174,7 +198,6 @@ export default function ProfilePage() {
       }
     }
 
-    // create new
     const { data: convo } = await supabase
       .from("conversations")
       .insert({})
@@ -189,75 +212,113 @@ export default function ProfilePage() {
     router.push(`/chat/${convo.id}`);
   }
 
-  if (!profile) return <p>Loading...</p>;
+  if (!profile) return <p className="ds-loading">Loading...</p>;
 
   return (
-    <div style={{ padding: 20, maxWidth: 600, margin: "auto" }}>
-      
-      <button onClick={() => router.push("/dashboard")}>
+    <div className="ds-page">
+
+      <button
+        className="ds-profile-back-btn"
+        onClick={() => router.push("/dashboard")}
+      >
         ⬅ Back
       </button>
 
-      <div style={{ textAlign: "center", marginTop: 20 }}>
-        {profile.avatar_url && (
+      <div className="ds-profile-hero">
+        {profile.avatar_url ? (
           <img
             src={profile.avatar_url}
-            width={100}
-            style={{ borderRadius: "50%" }}
+            alt=""
+            width={128}
+            height={128}
+            className="ds-profile-avatar"
           />
+        ) : (
+          <div className="ds-profile-avatar-placeholder">👤</div>
         )}
 
-        <h2>{profile.username}</h2>
+        <h1 className="ds-profile-username">{profile.username}</h1>
 
         {user?.id !== id && (
           <>
-            {isFollowing
-              ? <button onClick={unfollow}>Unfollow</button>
-              : <button onClick={follow}>Follow</button>
-            }
+            <div className="ds-profile-actions">
+              {isFollowing ? (
+                <button className="ds-btn ds-btn-secondary ds-btn-sm" onClick={unfollow}>
+                  Unfollow
+                </button>
+              ) : (
+                <button className="ds-btn ds-btn-primary ds-btn-sm" onClick={follow}>
+                  Follow
+                </button>
+              )}
 
-            <button
-              onClick={startChat}
-              style={{
-                marginLeft: 10,
-                background: "#4CAF50",
-                color: "white",
-                padding: "6px 12px",
-                borderRadius: 6
-              }}
-            >
-              💬 Message
-            </button>
+              <button className="ds-btn ds-btn-success ds-btn-sm" onClick={startChat}>
+                💬 Message
+              </button>
 
-            <button
-              onClick={sendCollabRequest}
-              style={{
-                marginLeft: 10,
-                background: "#FF9800",
-                color: "white",
-                padding: "6px 12px",
-                borderRadius: 6
-              }}
-            >
-              🤝 Collaborate
-            </button>
+              <button
+                className="ds-btn ds-btn-warning ds-btn-sm"
+                onClick={() => setShowCollabBox(!showCollabBox)}
+              >
+                🤝 Collaborate
+              </button>
+            </div>
+
+            {showCollabBox && (
+              <div className="ds-card mt-3 p-3">
+                <input
+                  className="ds-input w-full mb-2"
+                  placeholder="Project Title"
+                  value={collabTitle}
+                  onChange={(e) => setCollabTitle(e.target.value)}
+                />
+
+                <textarea
+                  className="ds-input w-full"
+                  placeholder="Write your collaboration idea..."
+                  value={collabMessage}
+                  onChange={(e) => setCollabMessage(e.target.value)}
+                  rows={3}
+                />
+
+                <button
+                  className="ds-btn ds-btn-success mt-2"
+                  onClick={sendCollabRequest}
+                >
+                  Send Request
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      <h3 style={{ marginTop: 30 }}>Posts</h3>
+      <h3 className="ds-h3">Posts</h3>
 
-      {posts.map((post) => (
-        <div key={post.id} style={{ marginTop: 15 }}>
-          {post.image_url && (
-            <img
-              src={post.image_url}
-              style={{ width: "100%", borderRadius: 10 }}
-            />
-          )}
-          <p><b>{post.caption}</b></p>
+      {posts.length === 0 ? (
+        <p className="ds-text-muted">No posts yet.</p>
+      ) : (
+        <div className="ds-profile-grid">
+          {posts.map((post) => (
+            <article key={post.id} className="ds-profile-post-card">
+              {post.image_url ? (
+                <img
+                  src={post.image_url}
+                  alt=""
+                  className="ds-profile-post-card-image"
+                />
+              ) : (
+                <div className="ds-profile-post-card-image-wrap">
+                  <span className="ds-text-subtle">📷</span>
+                </div>
+              )}
+              <div className="ds-profile-post-card-caption">
+                <p><b>{post.caption || "No caption"}</b></p>
+              </div>
+            </article>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

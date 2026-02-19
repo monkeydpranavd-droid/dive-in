@@ -58,28 +58,32 @@ export default function Profile() {
   };
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>Edit Profile</h1>
+    <div className="ds-page">
+      <div className="ds-card max-w-[500px]">
+        <h1 className="ds-h1">Edit Profile</h1>
 
-      <input
-        value={username}
-        placeholder="Username"
-        onChange={(e) => setUsername(e.target.value)}
-      />
+        <div className="ds-form-group">
+          <input
+            className="ds-input"
+            value={username}
+            placeholder="Username"
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        </div>
 
-      <br /><br />
+        <div className="ds-form-group">
+          <textarea
+            className="ds-textarea"
+            value={bio}
+            placeholder="Bio"
+            onChange={(e) => setBio(e.target.value)}
+          />
+        </div>
 
-      <textarea
-        value={bio}
-        placeholder="Bio"
-        onChange={(e) => setBio(e.target.value)}
-      />
-
-      <br /><br />
-
-      <button onClick={updateProfile} disabled={loading}>
-        {loading ? "Saving..." : "Save"}
-      </button>
+        <button className="ds-btn ds-btn-primary" onClick={updateProfile} disabled={loading}>
+          {loading ? "Saving..." : "Save"}
+        </button>
+      </div>
     </div>
   );
 }

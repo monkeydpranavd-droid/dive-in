@@ -30,25 +30,16 @@ export default function RequestsPage() {
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>🤝 Collaboration Requests</h2>
+    <div className="ds-page">
+      <h2 className="ds-h2">🤝 Collaboration Requests</h2>
 
-      {requests.length === 0 && <p>No requests yet.</p>}
+      {requests.length === 0 && <p className="ds-text-muted">No requests yet.</p>}
 
       {requests.map((req) => (
-        <div
-          key={req.id}
-          style={{
-            border: "1px solid #ccc",
-            padding: 12,
-            marginBottom: 10,
-            borderRadius: 8,
-          }}
-        >
-          <p><b>Status:</b> {req.status}</p>
-          <p>
-            <b>Created:</b>{" "}
-            {new Date(req.created_at).toLocaleString()}
+        <div key={req.id} className="ds-card mb-4">
+          <p className="ds-text-muted"><b className="text-white">Status:</b> {req.status}</p>
+          <p className="ds-text-muted mt-2">
+            <b className="text-white">Created:</b> {new Date(req.created_at).toLocaleString()}
           </p>
         </div>
       ))}

@@ -23,17 +23,16 @@ export default function Notifications(){
     setNotes(data||[]);
   }
 
-  return(
-    <div style={{padding:20}}>
-      <h2>🔔 Notifications</h2>
+  return (
+    <div className="ds-page">
+      <h2 className="ds-h2">🔔 Notifications</h2>
 
-      {notes.map(n=>(
-        <div key={n.id} style={{border:"1px solid #333",padding:10,marginTop:10}}>
+      {notes.map(n => (
+        <div key={n.id} className="ds-card mb-4">
           <b>{n.sender?.username}</b>
-
-          {n.type==="follow" && " followed you"}
-          {n.type==="like" && " liked your post"}
-          {n.type==="comment" && " commented on your post"}
+          {n.type === "follow" && " followed you"}
+          {n.type === "like" && " liked your post"}
+          {n.type === "comment" && " commented on your post"}
         </div>
       ))}
     </div>
